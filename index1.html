@@ -1,0 +1,2361 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Cardápio Real – Sistema com Autenticação e FIREBASE</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+  :root{
+    --primary:#ff3b3b;
+    --muted:#7d8590;
+    --bg:#f5f6f7;
+    --card:#ffffff;
+    --radius:12px;
+    font-family:Inter, "Helvetica Neue", Arial, sans-serif;
+    color:#222;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);padding:18px;display:flex;justify-content:center}
+  .app{width:100%;max-width:1200px}
+  header.banner{
+    background:linear-gradient(90deg,var(--primary),#ff6b6b);
+    color:#fff;border-radius:12px;padding:18px;display:flex;align-items:center;gap:16px;margin-bottom:14px;
+  }
+  header.banner img.logo{width:72px;height:72px;border-radius:50%;object-fit:cover;background:#fff;}
+  header .meta h1{margin:0;font-size:20px}
+  header .meta p{margin:6px 0 0;color:rgba(255,255,255,0.95);font-size:13px}
+  .controls{display:flex;gap:12px;align-items:center;margin-bottom:10px;flex-wrap:wrap}
+  .search{flex:1;display:flex;align-items:center;background:#fff;padding:8px;border-radius:10px}
+  .search input{border:0;outline:0;width:100%;font-size:15px}
+  .grid{display:grid;grid-template-columns:260px 1fr 360px;gap:14px}
+  @media (max-width:1024px){ .grid{grid-template-columns:1fr; } .cart-panel{position:fixed;right:10px;bottom:90px;width:320px;z-index:60} }
+  .side{background:var(--card);padding:12px;border-radius:12px;box-shadow:0 6px 20px rgba(0,0,0,0.06)}
+  main {
+      overflow-y: auto;
+      min-height: 0; 
+  }
+  .items{
+      display:flex;
+      flex-direction:column;
+      gap:12px;
+      padding-bottom: 30px; 
+  }
+  .categories button{display:block;width:100%;text-align:left;padding:10px;border-radius:8px;border:0;background:transparent;margin-bottom:8px;cursor:pointer}
+  .categories button.active{background:#fff7f7;color:var(--primary);font-weight:700}
+  .item{display:flex;gap:12px;align-items:flex-start;background:var(--card);padding:12px;border-radius:12px;box-shadow:0 6px 14px rgba(0,0,0,0.04)}
+  .item img{width:110px;height:90px;object-fit:cover;border-radius:10px}
+  .item .info h3{margin:0;display:flex;justify-content:space-between;align-items:center;gap:12px}
+  .item .info p{margin:6px 0 10px;color:var(--muted)}
+  .actions{display:flex;flex-direction:column;gap:8px;align-items:flex-end}
+  .btn{background:var(--primary);color:#fff;padding:8px 12px;border-radius:10px;border:0;cursor:pointer;font-weight:700}
+  .pill{background:#fff;padding:6px 10px;border-radius:10px;border:1px solid #eee;cursor:pointer}
+  .qty{display:flex;gap:6px;align-items:center;background:#fff;padding:6px;border-radius:8px}
+  .qty button{border:0;background:transparent;font-size:18px;cursor:pointer}
+  .modal{position:fixed;left:0;top:0;right:0;bottom:0;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,0.45);z-index:80;padding:12px}
+  .modal.open{display:flex}
+  .modal .card{background:#fff;border-radius:12px;padding:16px;width:100%;max-width:1000px;max-height:85vh;overflow:auto}
+  .addon-group{border:1px solid #f1f1f1;padding:12px;border-radius:8px;margin-bottom:12px}
+  .addon-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+  .addon-row{display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-top:1px solid #fbfbfb}
+  .addon-controls{display:flex;gap:8px;align-items:center}
+  .addon-controls button{background:#fff;border:1px solid #eee;border-radius:6px;padding:6px 10px;cursor:pointer}
+  .addon-controls .count{min-width:28px;text-align:center;display:inline-block}
+  .footer-fixed{position:fixed;left:0;right:0;bottom:0;background:#fff;border-top:1px solid #eee;padding:10px;display:flex;justify-content:center;z-index:90}
+  .cart-panel{background:var(--card);padding:12px;border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,0.08)}
+  .admin-bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px}
+  .small{font-size:13px;color:var(--muted)}
+  .meta-addon-info{font-size:12px;color:var(--muted);margin-top:4px}
+  .hidden{display:none}
+  .auth-tabs{display:flex;gap:8px;margin-bottom:16px}
+  .auth-tabs button{flex:1;padding:10px;border:0;background:#f5f5f5;border-radius:8px;cursor:pointer;font-weight:600}
+  .auth-tabs button.active{background:var(--primary);color:#fff}
+  .admin-tabs{display:flex;gap:8px;margin-bottom:16px;border-bottom:1px solid #eee;padding-bottom:8px;overflow-x:auto;}
+  .admin-tabs button{flex-shrink:0;padding:10px 15px;border:0;background:#f5f5f5;border-radius:8px;cursor:pointer;font-weight:600;}
+  .admin-tabs button.active{background:var(--primary);color:#fff;}
+  .admin-panel{padding-top:10px;}
+  
+  /* CORREÇÃO DO GRÁFICO: Define altura para o contêiner */
+  #salesPanel { 
+      height: 400px; /* Altura do contêiner para Chart.js */
+      padding-bottom: 20px; /* Espaçamento extra */
+  } 
+  #salesChart { 
+      width: 100%; 
+      height: 100%; /* Garante que o canvas preencha o contêiner */
+  }
+
+  .form-group{margin-bottom:14px}
+  .form-group label{display:block;margin-bottom:6px;font-weight:600;font-size:14px}
+  .form-group input, .form-group select, .form-group textarea{width:100%;padding:10px;border:1px solid #e1e1e1;border-radius:8px;font-size:14px}
+  .user-badge{background:#fff;padding:6px 12px;border-radius:20px;display:flex;align-items:center;gap:8px;cursor:pointer}
+  .user-badge:hover{background:#f9f9f9}
+  .item-management-note { background: #fff7e6; padding: 10px; border-radius: 8px; margin-bottom: 12px; border-left: 4px solid #ff9800; }
+  .addon-group-settings { margin-bottom: 15px; padding: 10px; border: 1px solid #e9ecef; border-radius: 6px; background: #f8f9fa; }
+  .addon-item-row { display: flex; gap: 8px; align-items: center; margin-bottom: 6px; }
+  .addon-item-row input { flex: 1; }
+  .delivery-area-row { display: flex; gap: 10px; align-items: center; margin-bottom: 8px; padding: 8px; border: 1px solid #eee; border-radius: 6px; }
+  .delivery-area-row input { padding: 8px; border: 1px solid #ddd; border-radius: 4px; }
+  .delivery-area-row .area-name-input { flex: 2; }
+  .delivery-area-row .area-fee-input { flex: 1; max-width: 100px; }
+</style>
+</head>
+<body>
+  <div class="app" id="app">
+    <header class="banner">
+      <img class="logo" id="logo" src="" alt="Logo">
+      <div class="meta">
+        <h1 id="name">Creamy Purple</h1>
+        <p id="addr">R ALCIDES RODRIGUES PONTES • <span id="status">Aberto até as 23:00</span></p>
+      </div>
+      <div style="margin-left:auto;text-align:right">
+        <div class="small">Entrega • Retirada</div>
+        <div class="small">Calcular taxa</div>
+      </div>
+      <div style="margin-left:12px">
+        <div class="user-badge" id="userBadge">
+          <span id="userIcon">👤</span>
+          <span id="userName">Entrar</span>
+        </div>
+      </div>
+    </header>
+
+    <div class="controls">
+      <div class="search"><input id="q" placeholder="Buscar no cardápio — ex: calabresa, bacon..." /></div>
+      <div id="adminControls" class="hidden">
+        <button class="pill" id="btnAdminPanel">Painel Admin</button>
+        <button class="pill" id="btnExport">Exportar JSON</button>
+        <button class="pill" id="btnImport">Importar JSON</button>
+        <input id="fileImport" type="file" accept=".json" style="display:none" />
+      </div>
+      <div style="margin-left:auto" class="admin-bar" id="adminBar">
+        <button class="pill" id="btnReset" style="background:#dc3545; color:white;">Reset demo (Firebase)</button>
+      </div>
+    </div>
+
+    <div class="grid">
+      <aside class="side">
+        <h4>Categorias</h4>
+        <div class="categories" id="cats"></div>
+        <hr/>
+        <div style="margin-top:8px" id="sidebarInfo">
+          <strong>Busca rápida:</strong>
+          <ul>
+            <li class="small">Pesquise por nome ou ingrediente</li>
+            <li class="small">Clique no ícone de usuário para entrar</li>
+          </ul>
+        </div>
+      </aside>
+
+      <main>
+        <div id="items" class="items"></div>
+
+        <div class="modal" id="adminModal">
+          <div class="card" role="dialog" aria-modal="true" style="max-width:1000px">
+            <h3>Painel de Administração</h3>
+            <div class="admin-tabs">
+              <button id="tabOrders" class="active">Pedidos em Tempo Real</button>
+              <button id="tabSales">Relatório de Vendas</button>
+              <button id="tabCustomers">Controle de Clientes</button>
+              <button id="tabSettings">Configurações da Loja</button>
+            </div>
+
+            <div id="adminContent">
+              <div id="ordersPanel" class="admin-panel">
+                <h4>Pedidos Atuais</h4>
+                <div id="currentOrdersList"></div>
+              </div>
+              <div id="salesPanel" class="admin-panel hidden">
+                <h4>Relatório Gráfico de Vendas</h4>
+                <canvas id="salesChart"></canvas>
+              </div>
+              <div id="customersPanel" class="admin-panel hidden">
+                <h4>Controle de Clientes</h4>
+                <div id="customersList"></div>
+              </div>
+              <div id="settingsPanel" class="admin-panel hidden">
+                <h4>Configurações da Loja</h4>
+                <form id="storeSettingsForm">
+                  <div class="form-group">
+                    <label for="restaurantName">Nome da Loja</label>
+                    <input type="text" id="restaurantName" required>
+                  </div>
+                  <div class="form-group">
+                    <label for="restaurantAddress">Endereço</label>
+                    <input type="text" id="restaurantAddress" required>
+                  </div>
+                  <div class="form-group" id="savedAddressesGroup" style="display:none;">
+                    <label for="savedAddresses">Endereços Salvos</label>
+                    <select id="savedAddresses" class="form-control">
+                      <option value="">Selecionar um endereço salvo...</option>
+                      <option value="Casa">Casa (Rua Exemplo, 123, Cidade)</option>
+                      <option value="Trabalho">Trabalho (Av. Principal, 456, Cidade)</option>
+                    </select>
+                  </div>
+                  <div class="form-group">
+                    <label for="restaurantStatus">Status (Horário de Funcionamento)</label>
+                    <input type="text" id="restaurantStatus" placeholder="Ex: Aberto até as 23:00" required>
+                  </div>
+                  
+                  <div class="form-group">
+                    <label for="restaurantLogoFile">Logo da Loja (Escolha Arquivo)</label>
+                    <input type="file" id="restaurantLogoFile" accept="image/*">
+                    <div style="margin-top:10px;"><img id="currentLogoPreview" src="" alt="Prévia do Logo" style="max-width:100px; height:auto; border-radius:8px;"></div>
+                    <input type="hidden" id="restaurantLogoUrl"> </div>
+                  <h5 style="margin-top:20px;">Taxas de Entrega por Área</h5>
+                  <div id="deliveryAreasList">
+                    </div>
+                  <button type="button" class="pill" id="btnAddDeliveryArea" style="background:#e6ffe6; color:#28a745; margin-bottom:10px;">+ Adicionar Área de Entrega</button>
+                  <div style="text-align:right;margin-top:16px">
+                    <button type="submit" class="btn">Salvar Configurações</button>
+                  </div>
+                </form>
+              </div>
+            </div>
+
+            <div style="text-align:right;margin-top:16px">
+              <button id="closeAdminModal" class="btn">Fechar</button>
+            </div>
+          </div>
+        </div>
+
+      </main>
+
+      <aside class="side cart-panel" id="cartPanel">
+        <h4>Carrinho</h4>
+        <div id="cartList"></div>
+        <div style="margin-top:10px;display:flex;justify-content:space-between;align-items:center">
+          <div>
+            <div class="small">Subtotal</div>
+            <div id="subtotal" style="font-weight:800">R$ 0,00</div>
+          </div>
+          <div>
+            <button id="btnCheckout" class="btn">Finalizar</button>
+          </div>
+        </div>
+      </aside>
+    </div>
+
+    <div class="modal" id="itemDetailsModal">
+      <div class="card" role="dialog" aria-modal="true" style="max-width:500px">
+        <h3 id="itemDetailsModalTitle">Adicionar Novo Item</h3>
+        <form id="itemDetailsForm">
+          <input type="hidden" id="itemIdDetails" />
+          <div class="form-group">
+            <label for="itemName">Nome do Item</label>
+            <input type="text" id="itemName" required>
+          </div>
+          <div class="form-group">
+            <label for="itemDesc">Descrição</label>
+            <textarea id="itemDesc" rows="3" required></textarea>
+          </div>
+          <div class="form-group">
+            <label for="itemPrice">Preço (R$)</label>
+            <input type="number" id="itemPrice" step="0.01" required>
+          </div>
+          <div class="form-group">
+            <label for="itemCategory">Categoria</label>
+            <select id="itemCategory" required></select>
+          </div>
+          <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">
+            <button type="button" id="itemDetailsCancel" class="pill">Cancelar</button>
+            <button type="submit" class="btn" id="itemDetailsSubmit">Salvar Detalhes</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <div class="modal" id="addonManagementModal">
+      <div class="card" role="dialog" aria-modal="true" style="max-width:800px">
+        <h3 id="addonManagementTitle">Gerenciar Adicionais para <span id="addonItemName" style="color:var(--primary);"></span></h3>
+        
+        <div id="addonGroupsList"></div>
+        
+        <div style="margin-top:16px; display:flex; justify-content:space-between; align-items:center;">
+          <button type="button" class="btn" id="btnAddAddonGroup" style="background:#28a745;">+ Adicionar Grupo</button>
+          <div>
+            <button type="button" id="addonManagementCancel" class="pill">Cancelar</button>
+            <button type="button" class="btn" id="addonManagementSubmit">Salvar Adicionais</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal" id="imageEditModal">
+      <div class="card" role="dialog" aria-modal="true" style="max-width:500px">
+        <h3 id="imageEditModalTitle">Editar Imagem para <span id="imageItemName" style="color:var(--primary);"></span></h3>
+        <form id="imageEditForm">
+          <input type="hidden" id="itemIdImage" />
+          
+          <div class="form-group">
+            <label for="itemImgFile">Escolher Imagem do Item</label>
+            <input type="file" id="itemImgFile" accept="image/*">
+            <input type="hidden" id="itemImgUrl"> </div>
+          <div style="text-align:center; margin-bottom:16px;">
+             <img id="currentImagePreview" src="" alt="Prévia" style="max-width:100%; height:auto; border-radius:8px; margin-top:10px;">
+          </div>
+          <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">
+            <button type="button" id="imageEditCancel" class="pill">Cancelar</button>
+            <button type="submit" class="btn" id="imageEditSubmit">Salvar Imagem</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+
+    <div class="modal" id="modal">
+      <div class="card" role="dialog" aria-modal="true">
+        <h3 id="modalTitle">Adicionais</h3>
+        <div style="display:flex;gap:12px;align-items:center;margin-bottom:8px">
+          <div><strong id="modalItemName"></strong></div>
+          <div style="margin-left:auto; display:flex; gap:8px; align-items:center;">
+            <div class="small">Quantidade do item:</div>
+            <div class="qty" id="itemQtyControls">
+              <button data-action="decrement-qty">-</button>
+              <span id="modalItemQty">1</span>
+              <button data-action="increment-qty">+</button>
+            </div>
+          </div>
+        </div>
+        <div id="modalAddons"></div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:12px">
+          <div class="small">Total do item: <strong id="modalTotal">R$ 0,00</strong></div>
+          <div>
+            <button id="modalCancel" class="pill">Cancelar</button>
+            <button id="modalConfirm" class="btn">Adicionar ao carrinho</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal" id="authModal">
+      <div class="card" role="dialog" aria-modal="true" style="max-width:420px">
+        <h3 id="authTitle">Entrar / Cadastrar</h3>
+        <div class="auth-tabs">
+          <button id="tabLogin" class="active">Entrar</button>
+          <button id="tabRegister">Cadastrar</button>
+        </div>
+        
+        <div id="loginForm">
+          <div class="form-group">
+            <label>Email ou usuário</label>
+            <input type="text" id="loginUser" placeholder="seu@email.com">
+          </div>
+          <div class="form-group">
+            <label>Senha</label>
+            <input type="password" id="loginPass" placeholder="••••••">
+          </div>
+          <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">
+            <button id="loginCancel" class="pill">Cancelar</button>
+            <button id="loginSubmit" class="btn">Entrar</button>
+          </div>
+        </div>
+
+        <div id="registerForm" class="hidden">
+          <div class="form-group">
+            <label>Nome completo</label>
+            <input type="text" id="regName" placeholder="João Silva">
+          </div>
+          <div class="form-group">
+            <label>Email</label>
+            <input type="email" id="regEmail" placeholder="seu@email.com">
+          </div>
+          <div class="form-group">
+            <label>Telefone</label>
+            <input type="tel" id="regPhone" placeholder="(11) 99999-9999">
+          </div>
+          <div class="form-group">
+            <label>Senha</label>
+            <input type="password" id="regPass" placeholder="••••••">
+          </div>
+          <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">
+            <button id="registerCancel" class="pill">Cancelar</button>
+            <button id="registerSubmit" class="btn">Cadastrar</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal" id="profileModal">
+      <div class="card" role="dialog" aria-modal="true" style="max-width:600px">
+        <h3>Meu Perfil</h3>
+        <div style="background:#f9f9f9;padding:12px;border-radius:8px;margin-bottom:16px">
+          <div style="display:flex;justify-content:space-between;margin-bottom:8px">
+            <strong id="profileName"></strong>
+            <button class="pill" id="logoutBtn">Sair</button>
+          </div>
+          <div class="small" id="profileEmail"></div>
+          <div class="small" id="profilePhone"></div>
+
+          <h4 style="margin-top:20px;">Meus Endereços Salvos</h4>
+          <div id="savedUserAddressesList">
+            </div>
+          <div class="form-group" style="margin-top:15px;">
+            <label for="newAddressInput">Adicionar Novo Endereço</label>
+            <input type="text" id="newAddressInput" placeholder="Ex: Rua Exemplo, 123 - Bairro - Cidade" />
+          </div>
+          <button type="button" class="btn" id="btnAddUserAddress" style="background:#28a745; margin-bottom:15px;">Salvar Endereço</button>
+
+          <hr/>
+        </div>
+        
+        <h4>Meus Pedidos</h4>
+        <div id="profileOrders"></div>
+        
+        <div style="text-align:right;margin-top:16px">
+          <button id="closeProfile" class="btn">Fechar</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal" id="checkoutModal">
+      <div class="card" role="dialog" aria-modal="true" style="max-width:600px">
+        <h3>Finalizar Pedido</h3>
+        
+        <form id="checkoutForm"> 
+            <div id="checkoutContent">
+              <h4>Seus Dados</h4>
+              <div class="form-group">
+                <label for="checkoutName">Nome Completo</label>
+                <input type="text" id="checkoutName" placeholder="Seu nome" required>
+              </div>
+              <div class="form-group">
+                <label for="checkoutAddress">Endereço de Entrega</label>
+                <input type="text" id="checkoutAddress" placeholder="Rua, número, bairro, complemento" required>
+    <div class="form-group" id="checkoutSavedAddressesGroup" style="display:none; margin-top: 10px;">
+      <label for="checkoutSavedAddresses">Ou selecione um endereço salvo:</label>
+      <select id="checkoutSavedAddresses" class="form-control">
+        <option value="" disabled selected>Selecione um endereço salvo...</option>
+      </select>
+    </div>
+              </div>
+              <div class="form-group">
+                <label for="checkoutPhone">Telefone</label>
+                <input type="tel" id="checkoutPhone" placeholder="(XX) XXXXX-XXXX" required>
+              </div>
+              
+              <div class="form-group">
+                  <label for="deliveryAreaSelect">Área de Entrega (Para cálculo da taxa)</label>
+                  <select id="deliveryAreaSelect" required>
+                      <option value="" disabled selected>Selecione sua área...</option>
+                      </select>
+              </div>
+              <h4>Forma de Pagamento</h4>
+              <div class="form-group">
+                <label>Escolha uma opção:</label>
+                <div>
+                  <input type="radio" id="paymentCredit" name="paymentMethod" value="credit" checked>
+                  <label for="paymentCredit">Cartão de Crédito</label>
+                </div>
+                <div>
+                  <input type="radio" id="paymentDebit" name="paymentMethod" value="debit">
+                  <label for="paymentDebit">Cartão de Débito</label>
+                </div>
+                <div>
+                  <input type="radio" id="paymentCash" name="paymentMethod" value="cash">
+                  <label for="paymentCash">Dinheiro</label>
+                </div>
+              </div>
+              <div class="form-group" id="cashChangeGroup" style="display:none;">
+                <label for="cashChange">Precisa de troco para quanto?</label>
+                <input type="number" id="cashChange" placeholder="Ex: 50.00">
+              </div>
+
+              <h4>Resumo do Pedido</h4>
+              <div id="checkoutCartSummary"></div>
+              <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px;border-top:1px solid #eee;padding-top:8px;margin-top:8px;">
+                <span>Subtotal:</span>
+                <span id="checkoutSubtotal">R$ 0,00</span>
+              </div>
+              <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:8px;">
+                <span>Taxa de Entrega (<span id="checkoutAreaName">N/A</span>):</span>
+                <span id="checkoutDeliveryFee">R$ 0,00</span>
+              </div>
+              <div style="margin-top:10px;display:flex;justify-content:space-between;align-items:center">
+                <div>
+                  <div class="small">Total Geral</div>
+                  <div id="checkoutTotal" style="font-weight:800; color:var(--primary);">R$ 0,00</div>
+                </div>
+              </div>
+
+            </div>
+            <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">
+              <button type="button" id="checkoutCancel" class="pill">Cancelar</button>
+              <button type="submit" id="checkoutSubmit" class="btn" disabled>Confirmar Pedido</button>
+            </div>
+        </form>
+        </div>
+    </div>
+
+    <div class="modal" id="confirmationModal">
+      <div class="card" role="dialog" aria-modal="true" style="max-width:500px; text-align:center;">
+        <h3 style="color:#28a745; margin-bottom: 0;">🎉 Pedido Confirmado!</h3>
+        <h1 id="orderNumberDisplay" style="color:var(--primary); margin: 10px 0 20px; font-size: 32px;">#XXXXXXX</h1>
+
+        <h4>Resumo do Pedido</h4>
+        <div id="confirmationSummaryContent" style="text-align:left; border:1px solid #eee; padding: 12px; border-radius:8px;">
+          </div>
+        
+        <p style="margin-top:20px; color:var(--muted); font-size:14px;">
+            Acompanhe o status do pedido no Painel do Administrador (se for admin) ou no seu Perfil.
+        </p>
+
+        <div style="text-align:right;margin-top:16px">
+          <button id="closeConfirmationModal" class="btn">Voltar ao Cardápio</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="footer-fixed">
+      <span id="footerStatus">Faça login para fazer pedidos</span>
+      <button class="btn" id="btnViewCart">Ver Carrinho (<span id="cartCount">0</span>)</button>
+    </div>
+
+  </div>
+
+<script type="module">
+// =========================================================================
+// === CONFIGURAÇÃO DO FIREBASE (CHAVES INSERIDAS PELO GÊMINI) ===
+// =========================================================================
+const firebaseConfig = {
+    apiKey: "AIzaSyBYxYq65hf2zwBTKrwuFAg5AmS5iM88aLU", 
+    authDomain: "luk123-b1986.firebaseapp.com", 
+    projectId: "luk123-b1986", 
+    storageBucket: "luk123-b1986.firebasestorage.app", 
+    messagingSenderId: "55447377903", 
+    appId: "1:55447377903:web:e9cbbcdba3a4ed5dc4081a"
+};
+// =========================================================================
+
+// === INICIALIZAÇÃO DO FIREBASE E SDKs NECESSÁRIOS ===
+import { initializeApp } from "https://www.gstatic.com/firebasejs/9.1.0/firebase-app.js";
+import { 
+    getFirestore, collection, doc, getDoc, setDoc, updateDoc, 
+    addDoc, query, orderBy, onSnapshot 
+} from "https://www.gstatic.com/firebasejs/9.1.0/firebase-firestore.js";
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+// Documento único para o cardápio e configurações da loja
+const menuDocRef = doc(db, "config", "cardapioData"); 
+// Coleção para pedidos, permitindo queries e tempo real
+const ordersCollectionRef = collection(db, "orders"); 
+// Coleção para usuários (opcional, mantendo o local storage para a demo)
+const usersCollectionRef = collection(db, "users");
+
+// Variáveis globais
+let DATA = null; 
+let orders = []; 
+let users = []; 
+
+const CART_KEY = "cardapio_cart_v1";
+const ORDERS_KEY = "cardapio_orders_v1";
+
+const ORDER_STATUSES = {
+  pending: { label: 'Pendente', color: '#ffc107' },
+  preparing: { label: 'Em Preparo', color: '#17a2b8' },
+  ready: { label: 'Pronto para Entrega', color: '#28a745' },
+  delivered: { label: 'Entregue', color: '#6c757d' },
+  cancelled: { label: 'Cancelado', color: '#dc3545' }
+};
+
+const ADMIN_CREDENTIALS = {
+  user: "admin",
+  pass: "admin123"
+};
+
+let activeCat = null;
+let cart = loadCart();
+let modalState = null;
+let itemState = null;
+let addonManagerState = null;
+let currentUser = null;
+let isAdmin = false;
+let salesChartInstance = null;
+let lastPendingCount = 0; // Para notificação
+
+
+const $ = sel => document.querySelector(sel);
+const formatBRL = v => "R$ " + (v || 0).toFixed(2).replace(".",",");
+
+// Funções de Storage (Mantidas para Carrinho e Login SIMPLIFICADO de Cliente)
+function loadCart(){ try{ return JSON.parse(localStorage.getItem(CART_KEY)) || []; }catch(e){ return []; } }
+function saveCart(){ localStorage.setItem(CART_KEY, JSON.stringify(cart)); }
+function loadUsers(){ try{ return JSON.parse(localStorage.getItem("cardapio_users_v1")) || []; }catch(e){ return []; } }
+function saveUsers(){ localStorage.setItem("cardapio_users_v1", JSON.stringify(users)); }
+
+// =========================================================================
+// === FUNÇÕES DE PERSISTÊNCIA (FIREBASE) ===
+// =========================================================================
+
+/**
+ * Carrega o cardápio do Firestore (config/cardapioData).
+ */
+async function fetchMenuData() {
+    try {
+        // 1. Carrega o Cardápio
+        const menuSnap = await getDoc(menuDocRef);
+        if (menuSnap.exists()) {
+            DATA = menuSnap.data();
+            console.log("Cardápio carregado do Firebase.");
+        } else {
+            console.warn("Nenhum dado de cardápio encontrado no Firebase. Usando Demo e salvando.");
+            DATA = loadDemoData();
+            // Salva a demo no Firebase para começar a persistência
+            await setDoc(menuDocRef, DATA);
+        }
+
+        // Inicializa a primeira categoria ativa
+        if (DATA.categories.length > 0) {
+            activeCat = DATA.categories[0].id;
+        }
+
+        renderAll();
+        // Começa a monitorar pedidos em tempo real imediatamente (ou após login)
+        setupRealtimeOrdersListener(); 
+
+        return true;
+    } catch (e) {
+        console.error("Erro ao carregar cardápio do Firebase:", e);
+        alert("Erro ao conectar com o banco de dados. Carregando dados de demonstração local.");
+        DATA = loadDemoData();
+        renderAll();
+        return false;
+    }
+}
+
+
+/**
+ * Salva o cardápio (DATA) de volta para o Firestore.
+ */
+async function saveMenuData() {
+    if (!isAdmin) {
+        alert("Acesso negado. Apenas administradores podem salvar.");
+        return false;
+    }
+    try {
+        await setDoc(menuDocRef, DATA);
+        console.log("Dados do cardápio salvos no Firebase com sucesso!");
+        return true;
+    } catch (e) {
+        console.error("Erro ao salvar cardápio no Firebase:", e);
+        alert("Falha ao salvar. Verifique as regras de segurança do seu Firebase.");
+        return false;
+    }
+}
+
+/**
+ * Mantém o array 'orders' atualizado em tempo real e notifica o admin.
+ */
+function setupRealtimeOrdersListener() {
+    // Busca todos os pedidos, ordenados pelo mais recente
+    const q = query(ordersCollectionRef, orderBy("createdAt", "desc"));
+
+    // onSnapshot: mantém a conexão aberta para updates em tempo real
+    onSnapshot(q, (snapshot) => {
+        const newOrders = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        
+        // Verifica se há novos pedidos pendentes APENAS se for Admin
+        if (isAdmin) {
+            const currentPending = newOrders.filter(o => o.status === "pending").length;
+            if (currentPending > lastPendingCount) {
+              notifyNewOrder();
+            }
+            lastPendingCount = currentPending;
+        }
+
+        orders = newOrders;
+        
+        // Atualiza as visualizações se estiverem abertas
+        if ($("#adminModal").classList.contains('open')) {
+            renderAdminOrders();
+            renderAdminDashboard();
+        }
+        if ($("#profileModal").classList.contains('open')) {
+            renderProfileOrders();
+        }
+    }, (error) => {
+        console.error("Erro no listener de pedidos:", error);
+    });
+}
+
+
+/**
+ * Atualiza o status de um pedido no Firestore.
+ * AGORA EXPOSTA GLOBALMENTE para uso no onchange do HTML
+ */
+async function updateOrderStatus(orderId, newStatus) {
+  if (!isAdmin) return;
+  
+  try {
+    const orderDocRef = doc(db, "orders", orderId);
+    await updateDoc(orderDocRef, { status: newStatus });
+    // O onSnapshot se encarregará de re-renderizar a lista automaticamente
+  } catch (e) {
+      console.error("Erro ao atualizar status no Firebase:", e);
+      alert("Falha ao atualizar o status do pedido.");
+  }
+}
+
+// =========================================================================
+// === FUNÇÕES DE AUTENTICAÇÃO E ADMIN (SIMPLIFICADAS E ADAPTADAS) ===
+// =========================================================================
+
+function doLogin(){
+    const user = $("#loginUser").value.trim();
+    const pass = $("#loginPass").value;
+    
+    if(!user || !pass){ alert("Preencha todos os campos"); return; }
+    
+    // Simulação de Login de Admin
+    if(user === ADMIN_CREDENTIALS.user && pass === ADMIN_CREDENTIALS.pass){ 
+        currentUser = { id: "admin", name: "Administrador", email: "admin@sistema.com", isAdmin: true, savedAddresses: [] };
+        isAdmin = true;
+        closeAuthModal();
+        updateUserBadge();
+        toggleAdminUI();
+        renderCategories();
+        renderItems();
+        // setupRealtimeOrdersListener já está ativo e começa a notificar
+        alert("Bem-vindo, Admin! Painel em Tempo Real (via Firebase) ativado. 🎉");
+        return;
+    }
+
+    // SIMULAÇÃO DE LOGIN DE CLIENTE (usa array local 'users')
+    const foundUser = users.find(u => (u.email === user || u.email === user) && u.password === pass);
+    if(foundUser){
+        currentUser = { id: foundUser.id, name: foundUser.name, email: foundUser.email, phone: foundUser.phone, isAdmin: false, savedAddresses: foundUser.savedAddresses || [] };
+        isAdmin = false;
+        closeAuthModal();
+        updateUserBadge();
+        toggleAdminUI();
+        renderCategories();
+        renderItems();
+        alert(`Bem-vindo de volta, ${foundUser.name.split(" ")[0]}! (Conta Simples) 😊`);
+        return;
+    }
+    
+    alert("Credenciais inválidas. Para Admin use: admin/admin123");
+}
+
+function doRegister(){
+    const name = $("#regName").value.trim();
+    const email = $("#regEmail").value.trim();
+    const phone = $("#regPhone").value.trim();
+    const pass = $("#regPass").value;
+    
+    if(!name || !email || !pass){ alert("Preencha nome, email e senha"); return; }
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if(!emailRegex.test(email)){ alert("Email inválido"); return; }
+    if(pass.length < 4){ alert("Senha deve ter pelo menos 4 caracteres"); return; }
+    if(users.find(u => u.email === email)){ alert("Email já cadastrado"); return; }
+    
+    const newUser = { id: Date.now().toString(), name, email, phone, password: pass, createdAt: new Date().toISOString(), savedAddresses: [] };
+    
+    users.push(newUser);
+    saveUsers(); // Salva no localStorage (para a demo)
+    
+    currentUser = { id: newUser.id, name: newUser.name, email: newUser.email, phone: newUser.phone, isAdmin: false, savedAddresses: [] };
+    closeAuthModal();
+    updateUserBadge();
+    alert(`Cadastro realizado! Bem-vindo, ${name.split(" ")[0]}! 🎉`);
+}
+
+
+// =========================================================================
+// === FUNÇÃO DE PEDIDO (AGORA PERSISTENTE FIREBASE) ===
+// =========================================================================
+
+async function finalizeOrder(e) {
+  e.preventDefault();
+  
+  if (!currentUser) {
+      alert("Você precisa estar logado para fazer o pedido.");
+      return;
+  }
+  
+  const selectedOption = $("#deliveryAreaSelect").options[$("#deliveryAreaSelect").selectedIndex];
+  if (!selectedOption || selectedOption.value === "") {
+      alert("Por favor, selecione sua Área de Entrega para calcular a taxa.");
+      return;
+  }
+
+  const deliveryFee = parseFloat(selectedOption.dataset.fee);
+  const subtotal = cart.reduce((sum, item) => sum + item.totalPrice, 0);
+  const total = subtotal + deliveryFee;
+  
+  const paymentMethod = document.querySelector('input[name="paymentMethod"]:checked').value;
+  let changeNeeded = 0;
+
+  if (paymentMethod === 'cash') {
+    changeNeeded = parseFloat($("#cashChange").value) || 0;
+    if (changeNeeded > 0 && changeNeeded < total) {
+      alert("O valor do troco deve ser maior ou igual ao total do pedido.");
+      return;
+    }
+  }
+
+  const newOrder = {
+    userId: currentUser.id,
+    userName: $("#checkoutName").value.trim(),
+    userPhone: $("#checkoutPhone").value.trim(),
+    address: $("#checkoutAddress").value.trim(),
+    deliveryAreaId: $("#deliveryAreaSelect").value,
+    deliveryAreaName: selectedOption.textContent.split('(')[0].trim(),
+    deliveryFee: deliveryFee,
+    items: cart.map(item => ({ 
+        name: item.name,
+        qty: item.qty || 1, 
+        totalPrice: item.totalPrice,
+        // Garante que o objeto de addon seja simples para o banco
+        addons: item.addons.flatMap(group => group.selected)
+            .map(addon => {
+                const originalItem = getItem(item.itemId);
+                const originalGroup = originalItem.addonGroups.find(g => g.id === addon.groupId);
+                const originalAddon = originalGroup.addons.find(a => a.id === addon.addonId);
+                return { 
+                    name: originalAddon.name, 
+                    qty: addon.qty, 
+                    price: originalAddon.price 
+                };
+            }) 
+    })), 
+    subtotal: subtotal,
+    total: total,
+    paymentMethod: paymentMethod,
+    changeNeeded: changeNeeded,
+    status: 'pending',
+    createdAt: new Date().toISOString()
+  };
+  
+  // Envio do pedido para o Firebase (banco de dados real!)
+  try {
+      const docRef = await addDoc(ordersCollectionRef, newOrder);
+      
+      cart = []; // Clear cart
+      saveCart();
+      
+      closeCheckoutModal();
+      renderCart();
+      showConfirmationModal({ ...newOrder, id: docRef.id }); 
+      
+  } catch (e) {
+      console.error("Falha ao salvar pedido no Firebase:", e);
+      alert("Falha ao finalizar pedido. Verifique sua conexão ou as regras do Firebase.");
+  }
+}
+
+// =========================================================================
+// === FUNÇÕES DE DEMONSTRAÇÃO E MANUTENÇÃO (Adaptadas para Firebase) ===
+// =========================================================================
+
+function loadDemoData(){
+  return {
+    restaurant:{ 
+      name:"Creamy Purple (FIREBASE TEST)", 
+      address:"Rua Fictícia, 61", 
+      status:"Aberto até as 23:00", 
+      logo:blankSVG(), 
+      deliveryAreas: [
+          { id: 'area1', name: 'Centro da Cidade', fee: 5.00 },
+          { id: 'area2', name: 'Região Oeste', fee: 8.00 }
+      ]
+    },
+    categories:[
+      {id:"lanc", title:"LANÇAMENTOS"},
+      {id:"trad", title:"Lanches Tradicionais"}
+    ],
+    items:[
+      { id:"cmb1", category:"lanc", name:"Combo Real-Time", desc:"Este item está salvo no Firebase!", price:57.00, img:blankSVG(), addonGroups:[
+            { id: 'g1', name: 'Escolha o Pão', max: 1, free: 0, required: true, addons: [
+                { id: 'a1', name: 'Pão Brioche', price: 0.00 },
+                { id: 'a2', name: 'Pão Australiano', price: 2.50 }
+            ]},
+            { id: 'g2', name: 'Adicionar Molho', max: 3, free: 1, required: false, addons: [
+                { id: 'a3', name: 'Maionese da Casa', price: 1.00 },
+                { id: 'a4', name: 'Molho Barbecue', price: 1.00 },
+                { id: 'a5', name: 'Molho Picante', price: 1.50 }
+            ]}
+      ] },
+      { id:"xcal", category:"trad", name:"X-Salada Firestore", desc:"Este cardápio é persistente.", price:24.00, img:blankSVG(), addonGroups:[] }
+    ]
+  };
+}
+
+// Altera a função resetDemo para salvar a demo no Firebase
+async function resetDemo(){ 
+    if(confirm("Restaurar demo? Perderá alterações salvas no Firebase e reescreverá o cardápio no banco.")){ 
+        DATA = loadDemoData(); 
+        cart=[]; 
+        saveCart(); 
+        await saveMenuData(); // Salva a demo no Firebase
+        renderAll(); 
+    } 
+}
+
+// === NOTIFICAÇÃO DO SISTEMA (Chamada pelo onSnapshot) ===
+if (Notification.permission !== "granted") {
+  Notification.requestPermission();
+}
+
+function notifyNewOrder() {
+  if (Notification.permission === "granted") {
+    new Notification("🛍️ Novo Pedido Recebido!", {
+      body: "Um novo pedido pendente chegou ao painel.",
+      icon: "https://cdn-icons-png.flaticon.com/512/2331/2331970.png"
+    });
+  }
+}
+
+// =========================================================================
+// === FUNÇÕES AUXILIARES (LÓGICA INALTERADA) ===
+// =========================================================================
+
+function blankSVG(){
+  return "data:image/svg+xml;charset=UTF-8," + encodeURIComponent(`<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'400\' height=\'400\'><rect fill=\'#fff\' width=\'100%\' height=\'100%\'/><text x=\'50%\' y=\'50%\' dominant-baseline=\'middle\' text-anchor=\'middle\' font-size=\'28\' fill=\'#ff3b3b\' font-family=\'Arial\'>Logo</text></svg>`);
+}
+
+function fileToBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = error => reject(error);
+    reader.readAsDataURL(file);
+  });
+}
+
+function renderAll(){
+  $("#name").textContent = DATA.restaurant.name;
+  $("#addr").textContent = DATA.restaurant.address + " • " + DATA.restaurant.status;
+  $("#logo").src = DATA.restaurant.logo || blankSVG();
+  renderCategories();
+  renderItems();
+  renderCart();
+  updateUserBadge();
+  toggleAdminUI();
+}
+
+function updateUserBadge(){
+  if(currentUser){
+    $("#userIcon").textContent = currentUser.isAdmin ? "⚙️" : "👤";
+    $("#userName").textContent = currentUser.name.split(" ")[0];
+    $("#footerStatus").textContent = currentUser.isAdmin ? "Modo Administrador ativo" : `Logado como ${currentUser.name.split(" ")[0]}`;
+  } else {
+    $("#userIcon").textContent = "👤";
+    $("#userName").textContent = "Entrar";
+    $("#footerStatus").textContent = "Faça login para fazer pedidos";
+  }
+}
+
+function toggleAdminUI() {
+  const adminControls = $("#adminControls");
+  const adminBar = $("#adminBar");
+  
+  if (isAdmin) {
+    adminControls.classList.remove("hidden");
+    $("#btnReset").classList.remove("hidden"); // Mostrar o botão reset que salva no Firebase
+  } else {
+    adminControls.classList.add("hidden");
+    $("#btnReset").classList.add("hidden");
+  }
+}
+
+function openAuthModal(){
+  $("#authModal").classList.add("open");
+  showLoginForm();
+}
+
+function closeAuthModal(){
+  $("#authModal").classList.remove("open");
+  clearAuthForms();
+}
+
+function showLoginForm(){
+  $("#tabLogin").classList.add("active");
+  $("#tabRegister").classList.remove("active");
+  $("#loginForm").classList.remove("hidden");
+  $("#registerForm").classList.add("hidden");
+}
+
+function showRegisterForm(){
+  $("#tabRegister").classList.add("active");
+  $("#tabLogin").classList.remove("active");
+  $("#registerForm").classList.remove("hidden");
+  $("#loginForm").classList.add("hidden");
+}
+
+function clearAuthForms(){
+  $("#loginUser").value = "";
+  $("#loginPass").value = "";
+  $("#regName").value = "";
+  $("#regEmail").value = "";
+  $("#regPhone").value = "";
+  $("#regPass").value = "";
+}
+
+function logout(){
+  currentUser = null;
+  isAdmin = false;
+  closeProfileModal();
+  updateUserBadge();
+  toggleAdminUI();
+  renderCategories();
+  renderItems();
+  cart = [];
+  renderCart();
+  alert("Você foi desconectado.");
+}
+
+function openProfileModal(){
+  if(!currentUser){ return; }
+  $("#profileModal").classList.add("open");
+  $("#profileName").textContent = currentUser.name;
+  $("#profileEmail").textContent = currentUser.email;
+  $("#profilePhone").textContent = currentUser.phone || "";
+  renderProfileOrders();
+  renderSavedUserAddresses();
+}
+
+function renderSavedUserAddresses() {
+  const addressesList = $("#savedUserAddressesList");
+  addressesList.innerHTML = "";
+  const currentAddresses = currentUser?.savedAddresses || [];
+  
+  if (currentAddresses.length > 0) {
+    currentAddresses.forEach((addr, index) => {
+      const addrDiv = document.createElement("div");
+      addrDiv.style.cssText = "display:flex; justify-content:space-between; align-items:center; background:#f5f5f5; padding:8px; border-radius:6px; margin-bottom:8px;";
+      addrDiv.innerHTML = `
+        <span>${addr}</span>
+        <button type="button" class="pill" style="background:#dc3545; color:white;" onclick="removeUserAddress(${index})">Remover</button>
+      `;
+      addressesList.appendChild(addrDiv);
+    });
+  } else {
+    addressesList.innerHTML = "<p class=\"small\">Nenhum endereço salvo ainda.</p>";
+  }
+}
+
+function addUserAddress() {
+  const newAddress = $("#newAddressInput").value.trim();
+  if (newAddress) {
+    if (!currentUser.savedAddresses) { currentUser.savedAddresses = []; }
+    currentUser.savedAddresses.push(newAddress);
+    $("#newAddressInput").value = "";
+    updateCurrentUserInUsersArray(); 
+    renderSavedUserAddresses();
+    alert("Endereço salvo com sucesso!");
+  } else {
+    alert("Por favor, digite um endereço.");
+  }
+}
+
+/**
+ * Funcao removeUserAddress agora exposta globalmente
+ */
+function removeUserAddress(index) {
+  if (confirm("Tem certeza que deseja remover este endereço?")) {
+    currentUser.savedAddresses.splice(index, 1);
+    updateCurrentUserInUsersArray(); 
+    renderSavedUserAddresses();
+    alert("Endereço removido.");
+  }
+}
+
+function updateCurrentUserInUsersArray() {
+    // Atualiza o array local de usuários e o localStorage
+    const userIndex = users.findIndex(u => u.id === currentUser.id);
+    if (userIndex > -1) {
+        users[userIndex] = { ...users[userIndex], savedAddresses: currentUser.savedAddresses, ...currentUser };
+        saveUsers();
+    }
+}
+
+function closeProfileModal(){
+  $("#profileModal").classList.remove("open");
+}
+
+function renderProfileOrders(){
+  // O array 'orders' é atualizado em tempo real pelo Firebase onSnapshot
+  const userOrders = orders.filter(order => order.userId === currentUser.id).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+  const profileOrdersDiv = $("#profileOrders");
+  profileOrdersDiv.innerHTML = "";
+  
+  if(userOrders.length === 0){
+    profileOrdersDiv.innerHTML = "<p class=\"small\">Nenhum pedido realizado ainda.</p>";
+    return;
+  }
+  
+  userOrders.forEach(order => {
+    const orderDiv = document.createElement("div");
+    orderDiv.style.cssText = "background:#fff;padding:10px;border-radius:8px;margin-bottom:10px;box-shadow:0 2px 8px rgba(0,0,0,0.05);";
+    const statusInfo = ORDER_STATUSES[order.status] || { label: 'Desconhecido', color: '#6c757d' };
+    
+    // Geração da lista de itens com adicionais
+    const itemsHtml = order.items.map(item => {
+        const addonsList = item.addons.map(addon => `+ ${addon.qty}x ${addon.name}`).join(' ');
+        return `<li style="font-size:12px;margin-bottom:4px;">${item.qty}x ${item.name} (${addonsList})</li>`;
+    }).join('');
+
+    orderDiv.innerHTML = `
+      <div style="display:flex;justify-content:space-between;font-size:14px;margin-bottom:6px;">
+        <strong>Pedido #${order.id.substring(0, 8)}</strong>
+        <span>${new Date(order.createdAt).toLocaleString()}</span>
+      </div>
+      <div style="font-size:13px;color:var(--muted);margin-bottom:8px;">
+        Total: <strong>${formatBRL(order.total)}</strong> (Taxa: ${formatBRL(order.deliveryFee)} - Área: ${order.deliveryAreaName || 'N/A'})
+      </div>
+      <div style="font-size:13px;color:var(--muted);margin-bottom:8px;">
+        Pagamento: ${order.paymentMethod === 'cash' ? `Dinheiro (${order.changeNeeded > 0 ? `Troco para ${formatBRL(order.changeNeeded)}` : 'Exato'})` : order.paymentMethod === 'credit' ? 'Cartão de Crédito' : 'Cartão de Débito'}
+      </div>
+      <ul style="list-style:none;padding:0;margin:0;border-top:1px solid #eee;padding-top:8px;">
+        ${itemsHtml}
+      </ul>
+      <div style="font-size:13px;color:${statusInfo.color};font-weight:bold; margin-top: 8px;">Status: ${statusInfo.label}</div>
+    `;
+    profileOrdersDiv.appendChild(orderDiv);
+  });
+}
+
+function renderCategories(){
+  const catsDiv = $("#cats");
+  catsDiv.innerHTML = "";
+  DATA.categories.forEach(cat => {
+    const btn = document.createElement("button");
+    btn.textContent = cat.title;
+    btn.dataset.id = cat.id;
+    if(cat.id === activeCat){ btn.classList.add("active"); }
+    btn.addEventListener("click", () => { activeCat = cat.id; renderCategories(); renderItems(); });
+
+    if (isAdmin) {
+      const container = document.createElement("div");
+      container.style.display = 'flex'; container.style.alignItems = 'center'; container.style.gap = '4px'; container.style.marginBottom = '8px';
+      btn.style.flexGrow = '1'; btn.style.margin = '0'; container.appendChild(btn);
+      const editBtn = document.createElement("button");
+      editBtn.textContent = '✏️'; editBtn.classList.add('pill'); 
+      editBtn.style.cssText = 'padding: 6px 8px; font-size: 14px; margin: 0;';
+      editBtn.addEventListener('click', (e) => { e.stopPropagation(); editCategory(cat.id); }); 
+      container.appendChild(editBtn);
+      const removeBtn = document.createElement("button");
+      removeBtn.textContent = '❌'; removeBtn.classList.add('pill'); 
+      removeBtn.style.cssText = 'padding: 6px 8px; font-size: 14px; margin: 0;';
+      removeBtn.addEventListener('click', (e) => { e.stopPropagation(); removeCategory(cat.id); }); 
+      container.appendChild(removeBtn);
+      catsDiv.appendChild(container);
+    } else {
+      catsDiv.appendChild(btn);
+    }
+  });
+
+  if(isAdmin){ 
+    const addCatBtn = document.createElement("button");
+    addCatBtn.textContent = "+ Adicionar Categoria";
+    addCatBtn.style.cssText = "background:#e6ffe6; color:#28a745; font-weight:bold; margin-top:10px;";
+    addCatBtn.addEventListener("click", addCategory);
+    catsDiv.appendChild(addCatBtn);
+  }
+}
+
+async function addCategory(){ 
+    const newCatName = prompt("Nome da nova categoria:"); 
+    if(newCatName){ 
+        const newCatId = newCatName.toLowerCase().replace(/[^a-z0-9]/g, '').replace(/[ ]/g, '_'); 
+        if(DATA.categories.find(c => c.id === newCatId)){ 
+            alert("Uma categoria com nome similar já existe. Tente outro nome."); 
+            return;
+        } 
+        DATA.categories.push({id:newCatId, title:newCatName}); 
+        await saveMenuData(); // <--- PERSISTE NO FIREBASE
+        renderCategories(); 
+    } 
+}
+
+function editCategory(id) {
+    const cat = DATA.categories.find(c => c.id === id);
+    if (!cat) return;
+    const newTitle = prompt(`Novo nome para "${cat.title}":`, cat.title);
+    if (newTitle && newTitle !== cat.title) {
+        cat.title = newTitle;
+        saveMenuData(); // <--- PERSISTE NO FIREBASE
+        renderCategories();
+    }
+}
+
+async function removeCategory(id) {
+    if (confirm("Ao remover a categoria, todos os itens associados a ela serão perdidos. Tem certeza?")) {
+        DATA.categories = DATA.categories.filter(c => c.id !== id);
+        DATA.items = DATA.items.filter(i => i.category !== id);
+        activeCat = DATA.categories.length > 0 ? DATA.categories[0].id : null;
+        await saveMenuData(); // <--- PERSISTE NO FIREBASE
+        renderCategories();
+        renderItems();
+    }
+}
+
+function renderItems(){
+  const itemsDiv = $("#items");
+  itemsDiv.innerHTML = "";
+  const filteredItems = DATA.items.filter(item => item.category === activeCat);
+  const currentCatTitle = DATA.categories.find(c => c.id === activeCat)?.title || "Itens";
+
+  const header = document.createElement("h2");
+  header.textContent = currentCatTitle;
+  header.style.marginBottom = '0';
+  itemsDiv.appendChild(header);
+
+  if (isAdmin) {
+    const adminNote = document.createElement("div");
+    adminNote.classList.add('item-management-note');
+    adminNote.innerHTML = '<strong>Modo Admin:</strong> Clique nos botões ✏️, 🖼️ ou ➕ para gerenciar itens.';
+    itemsDiv.appendChild(adminNote);
+    
+    const addItemBtn = document.createElement("button");
+    addItemBtn.textContent = "+ Adicionar Novo Item";
+    addItemBtn.classList.add('btn');
+    addItemBtn.style.cssText = 'background:#28a745; margin-bottom:12px;';
+    addItemBtn.addEventListener('click', () => openItemDetailsModal());
+    itemsDiv.appendChild(addItemBtn);
+  }
+
+  if (filteredItems.length === 0) {
+    itemsDiv.innerHTML += "<p class='small' style='margin-top:10px;'>Nenhum item nesta categoria.</p>";
+    return;
+  }
+
+  filteredItems.forEach(item => {
+    const itemDiv = document.createElement("div");
+    itemDiv.classList.add("item");
+    itemDiv.innerHTML = `
+      <img src="${item.img || blankSVG()}" alt="${item.name}" />
+      <div class="info" style="flex:1">
+        <h3>
+          ${item.name}
+          <span style="color:var(--primary)">${formatBRL(item.price)}</span>
+        </h3>
+        <p class="small">${item.desc}</p>
+        <div style="display:flex; gap:8px;">
+          ${isAdmin ? `
+            <button class="pill" data-id="${item.id}" data-action="edit">✏️ Detalhes</button>
+            <button class="pill" data-id="${item.id}" data-action="image">🖼️ Imagem</button>
+            <button class="pill" data-id="${item.id}" data-action="addons">➕ Adicionais</button>
+            <button class="pill" data-id="${item.id}" data-action="remove" style="background:#dc3545; color:white;">❌</button>
+          ` : ''}
+        </div>
+      </div>
+      <div class="actions">
+        <button class="btn" data-id="${item.id}" data-action="add-to-cart">Adicionar</button>
+      </div>
+    `;
+    itemsDiv.appendChild(itemDiv);
+  });
+}
+
+function openItemDetailsModal(itemId = null) {
+  $("#itemDetailsModal").classList.add("open");
+  const form = $("#itemDetailsForm");
+  form.reset();
+  
+  // Limpa e preenche as categorias no dropdown
+  const categorySelect = $("#itemCategory");
+  categorySelect.innerHTML = DATA.categories.map(cat => 
+    `<option value="${cat.id}">${cat.title}</option>`
+  ).join('');
+
+  if (itemId) {
+    itemState = DATA.items.find(i => i.id === itemId);
+    if (!itemState) return;
+    $("#itemDetailsModalTitle").textContent = "Editar Item: " + itemState.name;
+    $("#itemIdDetails").value = itemState.id;
+    $("#itemName").value = itemState.name;
+    $("#itemDesc").value = itemState.desc;
+    $("#itemPrice").value = itemState.price;
+    $("#itemCategory").value = itemState.category;
+  } else {
+    itemState = null;
+    $("#itemDetailsModalTitle").textContent = "Adicionar Novo Item";
+    $("#itemIdDetails").value = "";
+    $("#itemCategory").value = activeCat; // Categoria padrão é a ativa
+  }
+}
+
+function closeItemDetailsModal() {
+  $("#itemDetailsModal").classList.remove("open");
+  itemState = null;
+}
+
+async function saveItemDetails(e) {
+    e.preventDefault();
+    if (!isAdmin) return;
+
+    const id = $("#itemIdDetails").value.trim();
+    const name = $("#itemName").value.trim();
+    const desc = $("#itemDesc").value.trim();
+    const price = parseFloat($("#itemPrice").value);
+    const category = $("#itemCategory").value;
+
+    const itemIndex = DATA.items.findIndex(i => i.id === id);
+    if(itemIndex > -1){
+        DATA.items[itemIndex] = {...DATA.items[itemIndex], name, desc, price, category};
+    } else {
+        const newItem = { id: Date.now().toString(), name, desc, price, category, img: blankSVG(), addonGroups: [] };
+        DATA.items.push(newItem);
+    }
+
+    await saveMenuData(); // <--- PERSISTE NO FIREBASE
+    renderItems();
+    closeItemDetailsModal();
+}
+
+async function removeItem(itemId) {
+    if (confirm("Tem certeza que deseja remover este item?")) {
+        DATA.items = DATA.items.filter(i => i.id !== itemId);
+        await saveMenuData(); // <--- PERSISTE NO FIREBASE
+        renderItems();
+        alert("Item removido com sucesso!");
+    }
+}
+
+function openImageEditModal(itemId) {
+    itemState = DATA.items.find(i => i.id === itemId);
+    if (!itemState) return;
+    $("#imageEditModal").classList.add("open");
+    $("#itemIdImage").value = itemState.id;
+    $("#imageItemName").textContent = itemState.name;
+    $("#currentImagePreview").src = itemState.img || blankSVG();
+    $("#itemImgUrl").value = itemState.img || "";
+    $("#itemImgFile").value = null; // Limpa o input file
+}
+
+function closeImageEditModal() {
+    $("#imageEditModal").classList.remove("open");
+    itemState = null;
+}
+
+async function saveItemImage(e) {
+    e.preventDefault();
+    if (!isAdmin || !itemState) return;
+
+    const fileInput = $("#itemImgFile");
+    const itemUrlInput = $("#itemImgUrl");
+
+    if (fileInput.files.length > 0) {
+        try {
+            const base64 = await fileToBase64(fileInput.files[0]);
+            itemState.img = base64;
+        } catch (error) {
+            alert("Erro ao ler arquivo: " + error.message);
+            return;
+        }
+    } else if (itemUrlInput.value.trim() !== "") {
+        itemState.img = itemUrlInput.value.trim();
+    } else {
+        itemState.img = blankSVG();
+    }
+
+    await saveMenuData(); // <--- PERSISTE NO FIREBASE
+    renderItems();
+    closeImageEditModal();
+}
+
+function openAddonManagementModal(itemId) {
+    itemState = DATA.items.find(i => i.id === itemId);
+    if (!itemState) return;
+    addonManagerState = JSON.parse(JSON.stringify(itemState.addonGroups)); // Clone para edição
+    $("#addonManagementModal").classList.add("open");
+    $("#addonItemName").textContent = itemState.name;
+    renderAddonGroupsManagement();
+}
+
+function closeAddonManagementModal() {
+    $("#addonManagementModal").classList.remove("open");
+    itemState = null;
+    addonManagerState = null;
+}
+
+function renderAddonGroupsManagement() {
+    const list = $("#addonGroupsList");
+    list.innerHTML = "";
+    if (!addonManagerState || addonManagerState.length === 0) {
+        list.innerHTML = "<p class='small'>Nenhum grupo de adicional criado. Adicione um para começar.</p>";
+        return;
+    }
+
+    addonManagerState.forEach((group, groupIndex) => {
+        const groupDiv = document.createElement("div");
+        groupDiv.classList.add('addon-group-settings');
+        groupDiv.innerHTML = `
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+                <h5 style="margin:0;">Grupo: ${group.name}</h5>
+                <div>
+                    <button type="button" class="pill" onclick="removeAddonGroup(${groupIndex})" style="background:#dc3545; color:white; padding: 4px 8px;">Remover Grupo</button>
+                </div>
+            </div>
+            <div class="form-group" style="margin-top:10px;">
+                <label>Nome do Grupo</label>
+                <input type="text" value="${group.name}" oninput="updateAddonGroupProp(${groupIndex}, 'name', this.value)">
+            </div>
+            <div style="display:flex; gap:10px;">
+                <div class="form-group" style="flex:1;">
+                    <label>Máx. Seleção</label>
+                    <input type="number" value="${group.max}" min="1" oninput="updateAddonGroupProp(${groupIndex}, 'max', parseInt(this.value) || 1)">
+                </div>
+                <div class="form-group" style="flex:1;">
+                    <label>Grátis (contagem)</label>
+                    <input type="number" value="${group.free}" min="0" oninput="updateAddonGroupProp(${groupIndex}, 'free', parseInt(this.value) || 0)">
+                </div>
+                <div class="form-group" style="flex:1;">
+                    <label>Obrigatório?</label>
+                    <select onchange="updateAddonGroupProp(${groupIndex}, 'required', this.value === 'true')">
+                        <option value="false" ${group.required ? '' : 'selected'}>Não</option>
+                        <option value="true" ${group.required ? 'selected' : ''}>Sim</option>
+                    </select>
+                </div>
+            </div>
+            <h6 style="margin:10px 0 5px;">Adicionais do Grupo</h6>
+            <div id="addonItemsList_${groupIndex}">
+                ${group.addons.map((addon, addonIndex) => `
+                    <div class="addon-item-row">
+                        <input type="text" placeholder="Nome" value="${addon.name}" oninput="updateAddonItemProp(${groupIndex}, ${addonIndex}, 'name', this.value)">
+                        <input type="number" placeholder="Preço (R$)" step="0.01" value="${addon.price}" oninput="updateAddonItemProp(${groupIndex}, ${addonIndex}, 'price', parseFloat(this.value) || 0)">
+                        <button type="button" class="pill" onclick="removeAddonItem(${groupIndex}, ${addonIndex})" style="background:#f0ad4e; color:white; padding: 6px 10px;">-</button>
+                    </div>
+                `).join('')}
+            </div>
+            <button type="button" class="pill" style="background:#e6ffe6; color:#28a745; margin-top:10px;" onclick="addAddonItem(${groupIndex})">+ Adicionar Adicional</button>
+        `;
+        list.appendChild(groupDiv);
+    });
+}
+
+/**
+ * Funções de gerenciamento de addon agora expostas globalmente
+ */
+function updateAddonGroupProp(groupIndex, prop, value) {
+    addonManagerState[groupIndex][prop] = value;
+    renderAddonGroupsManagement();
+}
+
+function updateAddonItemProp(groupIndex, addonIndex, prop, value) {
+    addonManagerState[groupIndex].addons[addonIndex][prop] = value;
+    renderAddonGroupsManagement();
+}
+
+/**
+ * Funções de gerenciamento de addon agora expostas globalmente
+ */
+function addAddonGroup() {
+    addonManagerState.push({ 
+        id: Date.now().toString(), 
+        name: `Novo Grupo ${addonManagerState.length + 1}`, 
+        max: 1, free: 0, required: false, addons: [] 
+    });
+    renderAddonGroupsManagement();
+}
+
+/**
+ * Funções de gerenciamento de addon agora expostas globalmente
+ */
+function removeAddonGroup(index) {
+    if (confirm("Remover grupo de adicional?")) {
+        addonManagerState.splice(index, 1);
+        renderAddonGroupsManagement();
+    }
+}
+
+/**
+ * Funções de gerenciamento de addon agora expostas globalmente
+ */
+function addAddonItem(groupIndex) {
+    addonManagerState[groupIndex].addons.push({ id: Date.now().toString(), name: "Novo Adicional", price: 0.00 });
+    renderAddonGroupsManagement();
+}
+
+/**
+ * Funções de gerenciamento de addon agora expostas globalmente
+ */
+function removeAddonItem(groupIndex, addonIndex) {
+    addonManagerState[groupIndex].addons.splice(addonIndex, 1);
+    renderAddonGroupsManagement();
+}
+
+async function saveAddonManagement() {
+    if (!isAdmin || !itemState) return;
+
+    // Remove campos desnecessários do clone
+    const cleanGroups = addonManagerState.map(group => ({
+        id: group.id,
+        name: group.name,
+        max: group.max,
+        free: group.free,
+        required: group.required,
+        addons: group.addons.map(addon => ({
+            id: addon.id,
+            name: addon.name,
+            price: addon.price
+        }))
+    }));
+
+    itemState.addonGroups = cleanGroups;
+
+    await saveMenuData(); // <--- PERSISTE NO FIREBASE
+    renderItems();
+    closeAddonManagementModal();
+}
+
+// === Lógica do Carrinho ===
+
+function getItem(id) {
+  return DATA.items.find(i => i.id === id);
+}
+
+function findAddon(itemId, groupId, addonId) {
+  const item = getItem(itemId);
+  const group = item.addonGroups.find(g => g.id === groupId);
+  return group?.addons.find(a => a.id === addonId);
+}
+
+function openModal(itemId) {
+  const item = getItem(itemId);
+  if (!item) return;
+
+  modalState = {
+    itemId: item.id,
+    itemPrice: item.price,
+    itemQty: 1,
+    addons: item.addonGroups.map(group => ({
+      groupId: group.id,
+      name: group.name,
+      max: group.max,
+      free: group.free,
+      required: group.required,
+      selected: [] // {addonId, qty, price, name}
+    }))
+  };
+
+  $("#modalTitle").textContent = "Adicionais: " + item.name;
+  $("#modalItemName").textContent = item.name;
+  $("#modalItemQty").textContent = 1;
+
+  renderModalContent();
+  $("#modal").classList.add("open");
+}
+
+function closeModal() {
+  $("#modal").classList.remove("open");
+  modalState = null;
+}
+
+function calculateModalTotal() {
+  if (!modalState) return 0;
+  let total = modalState.itemPrice * modalState.itemQty;
+  modalState.addons.forEach(group => {
+    let priceCount = 0; // Contador para itens com preço
+    let freeCount = group.free;
+
+    group.selected.forEach(addon => {
+      const addonData = findAddon(modalState.itemId, group.groupId, addon.addonId);
+      
+      // Conta os itens que têm preço para aplicar a gratuidade
+      for(let i = 0; i < addon.qty; i++){
+          if(addonData.price > 0){
+              if(freeCount > 0){
+                  freeCount--;
+              } else {
+                  total += addonData.price * modalState.itemQty;
+                  priceCount++;
+              }
+          } else {
+             // Itens grátis (preço zero) não contam para o freeCount, apenas somam ao total se tiver preço
+          }
+      }
+    });
+  });
+  return total;
+}
+
+function renderModalContent() {
+  const modalAddonsDiv = $("#modalAddons");
+  modalAddonsDiv.innerHTML = "";
+  let isValid = true;
+  let validationMessages = [];
+
+  modalState.addons.forEach(group => {
+    const item = getItem(modalState.itemId);
+    const itemGroup = item.addonGroups.find(g => g.id === group.groupId);
+    if (!itemGroup) return;
+
+    const groupDiv = document.createElement("div");
+    groupDiv.classList.add("addon-group");
+    
+    let selectedCount = group.selected.reduce((sum, a) => sum + a.qty, 0);
+    
+    // Validação de Requisito
+    if (group.required && selectedCount === 0) {
+        isValid = false;
+        groupDiv.style.border = '1px solid #dc3545';
+        validationMessages.push(`${group.name} é obrigatório.`);
+    } else if (selectedCount > group.max) {
+        isValid = false;
+        groupDiv.style.border = '1px solid #ffc107';
+        validationMessages.push(`Selecione no máximo ${group.max} em ${group.name}.`);
+    }
+
+    // Calcula quantos itens gratuitos já foram utilizados para exibir
+    let freeUsed = 0;
+    let totalSelections = 0;
+    group.selected.forEach(addon => {
+      const addonData = findAddon(modalState.itemId, group.groupId, addon.addonId);
+      for(let i = 0; i < addon.qty; i++){
+          if(addonData.price > 0){
+              totalSelections++;
+              if(freeUsed < group.free){
+                  freeUsed++;
+              }
+          }
+      }
+    });
+    
+    const remainingToSelect = group.max - selectedCount;
+    const canSelectMore = remainingToSelect > 0;
+    const isSingleSelection = group.max === 1 && group.free === 0;
+
+
+    groupDiv.innerHTML = `
+      <div class="addon-header">
+        <strong>${group.required ? '🔴 ' : ''}${group.name}</strong>
+        <span class="small" style="color:${isValid ? 'var(--muted)' : '#dc3545'}">
+            Selecione até ${group.max} ${group.free > 0 ? `( ${group.free} grátis)` : ''}
+        </span>
+      </div>
+      <div class="meta-addon-info">
+        Selecionados: ${selectedCount} de ${group.max}. ${group.free > 0 ? `Itens grátis restantes: ${Math.max(0, group.free - freeUsed)}` : ''}
+      </div>
+      <div class="addon-list">
+        ${itemGroup.addons.map(addon => {
+          const selectedAddon = group.selected.find(a => a.addonId === addon.id);
+          const currentQty = selectedAddon ? selectedAddon.qty : 0;
+          const isPriceFree = addon.price === 0;
+          const displayPrice = isPriceFree ? 'Grátis' : formatBRL(addon.price);
+
+          return `
+            <div class="addon-row" data-addon-id="${addon.id}" data-group-id="${group.groupId}">
+              <div style="flex:1;">
+                ${addon.name} 
+                <span class="small" style="color:var(--primary)">
+                  + ${displayPrice}
+                </span>
+              </div>
+              <div class="addon-controls">
+                ${isSingleSelection ? `
+                    <input type="radio" name="addon_${group.groupId}" value="${addon.id}" ${currentQty > 0 ? 'checked' : ''} onchange="toggleAddonSingle(this.value, '${group.groupId}')" />
+                ` : `
+                    <button data-action="decrement" data-addon-id="${addon.id}" data-group-id="${group.groupId}">-</button>
+                    <span class="count">${currentQty}</span>
+                    <button data-action="increment" data-addon-id="${addon.id}" data-group-id="${group.groupId}" ${!canSelectMore && currentQty === 0 ? 'disabled' : ''}>+</button>
+                `}
+              </div>
+            </div>
+          `;
+        }).join('')}
+      </div>
+    `;
+    modalAddonsDiv.appendChild(groupDiv);
+  });
+  
+  // Exibir mensagens de validação
+  if (!isValid) {
+      const msgDiv = document.createElement("div");
+      msgDiv.style.cssText = 'padding: 10px; background: #ffe6e6; border-radius: 8px; margin-top: 10px; color: #dc3545; font-size: 14px;';
+      msgDiv.innerHTML = '<strong>Atenção:</strong> ' + validationMessages.join(' ');
+      modalAddonsDiv.appendChild(msgDiv);
+  }
+
+
+  const total = calculateModalTotal();
+  $("#modalTotal").textContent = formatBRL(total);
+  $("#modalConfirm").disabled = !isValid;
+}
+
+function toggleAddonSingle(addonId, groupId) {
+    const group = modalState.addons.find(g => g.groupId === groupId);
+    group.selected = []; // Limpa o array
+    
+    const addonData = findAddon(modalState.itemId, groupId, addonId);
+    if (addonData) {
+        group.selected.push({
+            addonId: addonData.id,
+            qty: 1,
+            price: addonData.price, // Embora o preço seja calculado no calculateModalTotal, é útil ter aqui
+            name: addonData.name
+        });
+    }
+    renderModalContent();
+}
+
+function updateAddonQuantity(addonId, groupId, change) {
+  const group = modalState.addons.find(g => g.groupId === groupId);
+  const addonData = findAddon(modalState.itemId, groupId, addonId);
+  if (!group || !addonData) return;
+
+  const currentCount = group.selected.reduce((sum, a) => sum + a.qty, 0);
+  const selectedAddon = group.selected.find(a => a.addonId === addonId);
+  let currentQty = selectedAddon ? selectedAddon.qty : 0;
+  
+  let newQty = currentQty + change;
+  let newCount = currentCount + change;
+
+  if (newQty < 0) return; 
+  if (newCount > group.max && change > 0) return;
+
+  if (newQty === 0) {
+    group.selected = group.selected.filter(a => a.addonId !== addonId);
+  } else if (selectedAddon) {
+    selectedAddon.qty = newQty;
+  } else if (change > 0) {
+    group.selected.push({
+      addonId: addonData.id,
+      qty: newQty,
+      price: addonData.price,
+      name: addonData.name
+    });
+  }
+
+  renderModalContent();
+}
+
+function updateItemQuantity(change) {
+  let newQty = modalState.itemQty + change;
+  if (newQty < 1) return;
+  modalState.itemQty = newQty;
+  $("#modalItemQty").textContent = newQty;
+  renderModalContent();
+}
+
+function addToCart() {
+  const item = getItem(modalState.itemId);
+  if (!item) return;
+
+  const cartItem = {
+    id: Date.now().toString(), // ID único para o item no carrinho
+    itemId: item.id,
+    name: item.name,
+    itemPrice: item.price,
+    qty: modalState.itemQty,
+    totalPrice: calculateModalTotal(),
+    // Armazena o estado completo dos adicionais para o checkout
+    addons: modalState.addons
+  };
+
+  cart.push(cartItem);
+  saveCart();
+  renderCart();
+  closeModal();
+}
+
+
+function renderCart() {
+  const cartListDiv = $("#cartList");
+  const subtotalDiv = $("#subtotal");
+  const btnCheckout = $("#btnCheckout");
+  let subtotal = 0;
+  cartListDiv.innerHTML = "";
+
+  if (cart.length === 0) {
+    cartListDiv.innerHTML = "<p class='small'>Carrinho vazio.</p>";
+    btnCheckout.disabled = true;
+    $("#btnViewCart").style.display = 'none';
+  } else {
+    btnCheckout.disabled = false;
+    $("#btnViewCart").style.display = 'inline-block';
+    
+    cart.forEach(item => {
+      subtotal += item.totalPrice;
+      const itemDiv = document.createElement("div");
+      itemDiv.style.cssText = "display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:10px; border-bottom:1px solid #f1f1f1; padding-bottom:8px;";
+      
+      // Mapeia os addons para exibição no carrinho lateral
+      const addonsText = item.addons.flatMap(group => 
+        group.selected.map(a => {
+            const addonData = findAddon(item.itemId, group.groupId, a.addonId);
+            return `${a.qty}x ${addonData.name}`;
+        })
+      ).join(', ');
+
+      itemDiv.innerHTML = `
+        <div style="flex:1; padding-right:8px;">
+          <strong>${item.qty}x ${item.name}</strong>
+          <div class="small">${addonsText}</div>
+        </div>
+        <div style="text-align:right;">
+          <div style="font-weight:700; color:var(--primary)">${formatBRL(item.totalPrice)}</div>
+          <button class="pill" style="padding:4px 8px; font-size:12px; margin-top:4px;" data-id="${item.id}" data-action="remove-cart">Remover</button>
+        </div>
+      `;
+      cartListDiv.appendChild(itemDiv);
+    });
+  }
+
+  subtotalDiv.textContent = formatBRL(subtotal);
+  $("#cartCount").textContent = cart.length;
+}
+
+function removeFromCart(id) {
+  cart = cart.filter(item => item.id !== id);
+  saveCart();
+  renderCart();
+}
+
+// === Lógica de Checkout ===
+
+function openCheckoutModal() {
+  if (cart.length === 0) {
+    alert("Seu carrinho está vazio!");
+    return;
+  }
+  $("#checkoutModal").classList.add("open");
+  renderCheckoutContent();
+  
+  // Preenche dados do usuário logado (se houver)
+  if (currentUser) {
+    $("#checkoutName").value = currentUser.name || "";
+    $("#checkoutPhone").value = currentUser.phone || "";
+    // O endereço será preenchido após seleção da área ou via endereço salvo
+    
+    // Renderiza endereços salvos
+    const addresses = currentUser.savedAddresses || [];
+    const savedAddressSelect = $("#checkoutSavedAddresses");
+    savedAddressSelect.innerHTML = '<option value="" disabled selected>Selecione um endereço salvo...</option>';
+    
+    if (addresses.length > 0) {
+        $("#checkoutSavedAddressesGroup").style.display = 'block';
+        addresses.forEach((addr, index) => {
+            const option = document.createElement('option');
+            option.value = addr;
+            option.textContent = addr;
+            savedAddressSelect.appendChild(option);
+        });
+    } else {
+        $("#checkoutSavedAddressesGroup").style.display = 'none';
+    }
+
+  } else {
+    // Caso não haja usuário, limpa os campos
+    $("#checkoutName").value = "";
+    $("#checkoutPhone").value = "";
+    $("#checkoutAddress").value = "";
+    $("#checkoutSavedAddressesGroup").style.display = 'none';
+  }
+}
+
+function closeCheckoutModal() {
+  $("#checkoutModal").classList.remove("open");
+}
+
+function renderCheckoutContent() {
+    const summaryDiv = $("#checkoutCartSummary");
+    const subtotalDiv = $("#checkoutSubtotal");
+    const totalDiv = $("#checkoutTotal");
+    const areaSelect = $("#deliveryAreaSelect");
+    const checkoutSubmit = $("#checkoutSubmit");
+
+    let subtotal = cart.reduce((sum, item) => sum + item.totalPrice, 0);
+    
+    // Preencher Áreas de Entrega
+    areaSelect.innerHTML = '<option value="" disabled selected>Selecione sua área...</option>';
+    DATA.restaurant.deliveryAreas.forEach(area => {
+        const option = document.createElement('option');
+        option.value = area.id;
+        option.textContent = `${area.name} (${formatBRL(area.fee)})`;
+        option.dataset.fee = area.fee;
+        areaSelect.appendChild(option);
+    });
+
+    // Limpa o resumo do carrinho
+    summaryDiv.innerHTML = cart.map(item => {
+        // Mapeia os addons para exibição no resumo
+        const addonsText = item.addons.flatMap(group => 
+            group.selected.map(a => {
+                const addonData = findAddon(item.itemId, group.groupId, a.addonId);
+                return `${a.qty}x ${addonData.name}`;
+            })
+        ).join(', ');
+        
+        return `
+            <div style="font-size:13px; margin-bottom:4px;">
+                ${item.qty}x ${item.name} 
+                <span class="small" style="margin-left:8px;">${addonsText}</span>
+            </div>
+        `;
+    }).join('');
+
+    subtotalDiv.textContent = formatBRL(subtotal);
+    updateCheckoutTotal();
+
+    // Desativa o botão de confirmar se a área não está selecionada
+    checkoutSubmit.disabled = areaSelect.value === "";
+}
+
+function updateCheckoutTotal() {
+    const areaSelect = $("#deliveryAreaSelect");
+    const deliveryFeeDiv = $("#checkoutDeliveryFee");
+    const totalDiv = $("#checkoutTotal");
+    const areaNameDiv = $("#checkoutAreaName");
+    const checkoutSubmit = $("#checkoutSubmit");
+
+    const selectedOption = areaSelect.options[areaSelect.selectedIndex];
+    
+    let subtotal = cart.reduce((sum, item) => sum + item.totalPrice, 0);
+    let deliveryFee = 0;
+    let areaName = 'N/A';
+
+    if (selectedOption && selectedOption.value !== "") {
+        deliveryFee = parseFloat(selectedOption.dataset.fee);
+        areaName = selectedOption.textContent.split('(')[0].trim();
+        checkoutSubmit.disabled = false;
+    } else {
+        checkoutSubmit.disabled = true;
+    }
+
+    const total = subtotal + deliveryFee;
+
+    deliveryFeeDiv.textContent = formatBRL(deliveryFee);
+    totalDiv.textContent = formatBRL(total);
+    areaNameDiv.textContent = areaName;
+}
+
+function showConfirmationModal(order) {
+    $("#orderNumberDisplay").textContent = `#${order.id.substring(0, 8)}`;
+    const content = $("#confirmationSummaryContent");
+    
+    const itemsHtml = order.items.map(item => {
+        const addonsList = item.addons.map(addon => `${addon.qty}x ${addon.name}`).join('; ');
+        return `
+            <div style="font-size:14px; margin-bottom:4px;">
+                <strong>${item.qty}x ${item.name}</strong> 
+                <span class="small" style="display:block; color:var(--muted); margin-left:10px;">${addonsList}</span>
+            </div>
+        `;
+    }).join('');
+
+    content.innerHTML = `
+        <p style="font-size:14px; margin-bottom:10px;">
+            Endereço: <strong>${order.address}</strong>
+        </p>
+        <div style="border-bottom: 1px solid #eee; padding-bottom: 8px; margin-bottom: 8px;">
+            ${itemsHtml}
+        </div>
+        <div style="display:flex; justify-content:space-between; font-size:14px; font-weight:bold;">
+            <span>Total:</span>
+            <span style="color:var(--primary);">${formatBRL(order.total)}</span>
+        </div>
+        <div style="font-size:12px; margin-top: 5px;">
+            Pagamento: ${order.paymentMethod === 'cash' ? `Dinheiro (${order.changeNeeded > 0 ? `Troco para ${formatBRL(order.changeNeeded)}` : 'Exato'})` : order.paymentMethod === 'credit' ? 'Cartão de Crédito' : 'Cartão de Débito'}
+        </div>
+    `;
+
+    $("#confirmationModal").classList.add("open");
+}
+
+function closeConfirmationModal() {
+    $("#confirmationModal").classList.remove("open");
+}
+
+
+// === Lógica do Painel Admin ===
+
+function openAdminModal() {
+    if (!isAdmin) return;
+    $("#adminModal").classList.add("open");
+    
+    // Reseta para a aba de pedidos e renderiza
+    document.querySelectorAll('.admin-panel').forEach(p => p.classList.add('hidden'));
+    document.querySelectorAll('.admin-tabs button').forEach(b => b.classList.remove('active'));
+    $("#ordersPanel").classList.remove('hidden');
+    $("#tabOrders").classList.add('active');
+
+    renderAdminOrders();
+    renderAdminDashboard();
+    renderStoreSettings();
+}
+
+function closeAdminModal() {
+    $("#adminModal").classList.remove("open");
+}
+
+function renderAdminOrders() {
+    const ordersListDiv = $("#currentOrdersList");
+    ordersListDiv.innerHTML = "";
+    
+    if (orders.length === 0) {
+        ordersListDiv.innerHTML = "<p class='small'>Nenhum pedido registrado no Firebase ainda.</p>";
+        return;
+    }
+
+    orders.forEach(order => {
+        const orderDiv = document.createElement("div");
+        orderDiv.style.cssText = "background:#f8f9fa;padding:12px;border-radius:8px;margin-bottom:12px;border-left:5px solid " + (ORDER_STATUSES[order.status]?.color || '#6c757d') + ";";
+        const statusInfo = ORDER_STATUSES[order.status] || { label: 'Desconhecido', color: '#6c757d' };
+
+        const itemsHtml = order.items.map(item => {
+            const addonsList = item.addons.map(addon => `${addon.qty}x ${addon.name}`).join('; ');
+            return `<li style="font-size:12px;margin-bottom:2px;">${item.qty}x ${item.name} (${addonsList})</li>`;
+        }).join('');
+
+        const statusOptions = Object.keys(ORDER_STATUSES).map(key => 
+            `<option value="${key}" ${key === order.status ? 'selected' : ''}>${ORDER_STATUSES[key].label}</option>`
+        ).join('');
+
+        orderDiv.innerHTML = `
+            <div style="display:flex;justify-content:space-between;align-items:center;font-size:15px;margin-bottom:8px;">
+                <strong>Pedido #${order.id.substring(0, 8)}</strong>
+                <span style="color:${statusInfo.color};font-weight:bold;">${statusInfo.label}</span>
+            </div>
+            <div style="font-size:13px;color:var(--muted);margin-bottom:8px;">
+                Cliente: ${order.userName} (${order.userPhone})<br>
+                Endereço: ${order.address} (Taxa: ${formatBRL(order.deliveryFee)})<br>
+                Total: <strong style="color:var(--primary);">${formatBRL(order.total)}</strong> (Pagamento: ${order.paymentMethod === 'cash' ? `Dinheiro (${order.changeNeeded > 0 ? `Troco para ${formatBRL(order.changeNeeded)}` : 'Exato'})` : order.paymentMethod === 'credit' ? 'Cartão de Crédito' : 'Cartão de Débito'})
+            </div>
+            <ul style="list-style:none;padding:0;margin:0;border-top:1px solid #eee;padding-top:8px;margin-bottom:10px;">
+                ${itemsHtml}
+            </ul>
+            <div style="display:flex;justify-content:flex-end;gap:10px;align-items:center;">
+                <span class="small">Atualizar Status:</span>
+                <select onchange="updateOrderStatus('${order.id}', this.value)">
+                    ${statusOptions}
+                </select>
+            </div>
+        `;
+        ordersListDiv.appendChild(orderDiv);
+    });
+}
+
+function renderAdminDashboard() {
+    // Implementação de Relatório de Vendas (Simulado com base em 'orders')
+    const chartData = getSalesData(orders);
+    
+    if (salesChartInstance) {
+        salesChartInstance.data.labels = chartData.labels;
+        salesChartInstance.data.datasets[0].data = chartData.data;
+        salesChartInstance.update();
+    } else {
+        const ctx = $("#salesChart").getContext('2d');
+        salesChartInstance = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: chartData.labels,
+                datasets: [{
+                    label: 'Vendas (R$)',
+                    data: chartData.data,
+                    backgroundColor: 'rgba(255, 59, 59, 0.7)',
+                    borderColor: 'rgba(255, 59, 59, 1)',
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true
+                    }
+                }
+            }
+        });
+    }
+
+    // Implementação de Controle de Clientes (Simulado com base em 'orders' e 'users' locais)
+    renderAdminCustomers();
+}
+
+function getSalesData(orders) {
+    const salesByDay = {};
+    orders.filter(o => o.status === 'delivered').forEach(order => {
+        const date = new Date(order.createdAt).toISOString().split('T')[0];
+        salesByDay[date] = (salesByDay[date] || 0) + order.total;
+    });
+
+    const labels = Object.keys(salesByDay).sort().slice(-7); // Últimos 7 dias
+    const data = labels.map(date => salesByDay[date]);
+    
+    return { labels, data };
+}
+
+function renderAdminCustomers() {
+    const customersListDiv = $("#customersList");
+    customersListDiv.innerHTML = "";
+
+    // Agrupa pedidos por cliente para simular o histórico
+    const customerOrders = orders.reduce((acc, order) => {
+        if (!acc[order.userId]) {
+            acc[order.userId] = {
+                name: order.userName,
+                email: 'N/A', 
+                phone: order.userPhone,
+                totalOrders: 0,
+                totalSpent: 0
+            };
+        }
+        acc[order.userId].totalOrders += 1;
+        acc[order.userId].totalSpent += order.total;
+        return acc;
+    }, {});
+
+    const customerData = Object.values(customerOrders).sort((a, b) => b.totalSpent - a.totalSpent);
+
+    if (customerData.length === 0) {
+        customersListDiv.innerHTML = "<p class='small'>Nenhum cliente com pedidos finalizados ainda.</p>";
+        return;
+    }
+
+    customerData.forEach(customer => {
+        const customerDiv = document.createElement("div");
+        customerDiv.style.cssText = "background:#fff;padding:10px;border-radius:8px;margin-bottom:10px;box-shadow:0 2px 8px rgba(0,0,0,0.05);";
+        customerDiv.innerHTML = `
+            <div style="display:flex;justify-content:space-between;font-size:14px;margin-bottom:4px;">
+                <strong>${customer.name}</strong>
+                <span>Pedidos: ${customer.totalOrders}</span>
+            </div>
+            <div style="font-size:13px;color:var(--muted);">
+                Telefone: ${customer.phone}
+            </div>
+            <div style="font-size:14px;font-weight:bold;margin-top:4px;">
+                Total Gasto: <span style="color:var(--primary);">${formatBRL(customer.totalSpent)}</span>
+            </div>
+        `;
+        customersListDiv.appendChild(customerDiv);
+    });
+}
+
+function renderStoreSettings() {
+    // Preenche os campos do formulário com os dados do DATA
+    $("#restaurantName").value = DATA.restaurant.name;
+    $("#restaurantAddress").value = DATA.restaurant.address;
+    $("#restaurantStatus").value = DATA.restaurant.status;
+    $("#restaurantLogoUrl").value = DATA.restaurant.logo || "";
+    $("#currentLogoPreview").src = DATA.restaurant.logo || blankSVG();
+
+    renderDeliveryAreasList();
+}
+
+function renderDeliveryAreasList() {
+    const list = $("#deliveryAreasList");
+    list.innerHTML = "";
+    DATA.restaurant.deliveryAreas.forEach((area, index) => {
+        const row = document.createElement('div');
+        row.classList.add('delivery-area-row');
+        row.dataset.id = area.id;
+        row.innerHTML = `
+            <input type="text" class="area-name-input" placeholder="Nome da Área" value="${area.name}">
+            <input type="number" class="area-fee-input" placeholder="Taxa R$" step="0.01" value="${area.fee}">
+            <button type="button" class="pill" style="background:#dc3545; color:white;" onclick="removeDeliveryArea('${area.id}')">X</button>
+        `;
+        list.appendChild(row);
+    });
+}
+
+function addDeliveryArea() {
+    const newId = Date.now().toString();
+    DATA.restaurant.deliveryAreas.push({ id: newId, name: 'Nova Área', fee: 0.00 });
+    renderDeliveryAreasList();
+}
+
+function removeDeliveryArea(id) {
+    if (confirm("Remover esta área de entrega?")) {
+        DATA.restaurant.deliveryAreas = DATA.restaurant.deliveryAreas.filter(a => a.id !== id);
+        renderDeliveryAreasList();
+    }
+}
+
+// Esta função agora é responsável por salvar no Firebase
+async function saveStoreSettings(e) {
+    e.preventDefault();
+    if (!isAdmin) return;
+
+    // Atualiza o objeto DATA global
+    DATA.restaurant.name = $("#restaurantName").value.trim();
+    DATA.restaurant.address = $("#restaurantAddress").value.trim();
+    DATA.restaurant.status = $("#restaurantStatus").value.trim();
+    
+    // Processamento da imagem de logo
+    const logoFile = $("#restaurantLogoFile").files[0];
+    if (logoFile) {
+        try {
+            const base64Logo = await fileToBase64(logoFile);
+            DATA.restaurant.logo = base64Logo;
+        } catch (error) {
+            alert("Erro ao ler arquivo da logo: " + error.message);
+            return;
+        }
+    } else {
+        DATA.restaurant.logo = $("#restaurantLogoUrl").value.trim();
+    }
+    
+
+    const deliveryAreas = [];
+    document.querySelectorAll('#deliveryAreasList > .delivery-area-row').forEach(row => {
+        const id = row.dataset.id;
+        const name = row.querySelector('.area-name-input').value.trim();
+        const fee = parseFloat(row.querySelector('.area-fee-input').value) || 0;
+        if (name) {
+            deliveryAreas.push({ id, name, fee });
+        }
+    });
+    DATA.restaurant.deliveryAreas = deliveryAreas;
+
+    await saveMenuData(); // <--- CHAMA A FUNÇÃO FIREBASE
+    renderAll();
+    alert("Configurações da loja salvas no Firebase!");
+    closeAdminModal();
+}
+
+// === Listeners de Eventos ===
+
+function initListeners(){
+  document.body.addEventListener("click", (e) => {
+    // Lógica para adicionar/remover do carrinho e abrir modal
+    if(e.target.dataset.action === "add-to-cart"){ openModal(e.target.dataset.id); }
+    if(e.target.dataset.action === "remove-cart"){ removeFromCart(e.target.dataset.id); }
+
+    // Lógica Admin (CRUD de Itens)
+    if (isAdmin) {
+      if(e.target.dataset.action === "edit"){ openItemDetailsModal(e.target.dataset.id); }
+      if(e.target.dataset.action === "addons"){ openAddonManagementModal(e.target.dataset.id); }
+      if(e.target.dataset.action === "image"){ openImageEditModal(e.target.dataset.id); }
+      if(e.target.dataset.action === "remove"){ removeItem(e.target.dataset.id); }
+    }
+  });
+
+  // Listeners do Modal de Adicionais
+  $("#modalAddons").addEventListener("click", (e) => {
+    if(e.target.dataset.action === "increment"){ updateAddonQuantity(e.target.dataset.addonId, e.target.dataset.groupId, 1); }
+    if(e.target.dataset.action === "decrement"){ updateAddonQuantity(e.target.dataset.addonId, e.target.dataset.groupId, -1); }
+  });
+  
+  // Listeners de Qty do Item
+  $("#itemQtyControls").addEventListener("click", (e) => {
+    if(e.target.dataset.action === "increment-qty"){ updateItemQuantity(1); }
+    if(e.target.dataset.action === "decrement-qty"){ updateItemQuantity(-1); }
+  });
+
+  // Outros Listeners
+  $("#q").addEventListener("input", renderItems);
+  $("#btnCheckout").addEventListener("click", openCheckoutModal);
+  $("#btnViewCart").addEventListener("click", openCheckoutModal);
+  $("#modalCancel").addEventListener("click", closeModal);
+  $("#modalConfirm").addEventListener("click", addToCart);
+  $("#itemDetailsCancel").addEventListener("click", closeItemDetailsModal);
+  $("#itemDetailsForm").addEventListener("submit", saveItemDetails);
+  $("#addonManagementCancel").addEventListener("click", closeAddonManagementModal);
+  $("#addonManagementSubmit").addEventListener("click", saveAddonManagement);
+  $("#btnAddAddonGroup").addEventListener("click", addAddonGroup);
+  $("#imageEditCancel").addEventListener("click", closeImageEditModal);
+  $("#imageEditForm").addEventListener("submit", saveItemImage);
+  $("#imageEditForm").addEventListener("input", (e) => {
+    if (e.target.id === 'itemImgFile' && e.target.files.length > 0) {
+        fileToBase64(e.target.files[0]).then(base64 => {
+            $("#currentImagePreview").src = base64;
+            $("#itemImgUrl").value = base64; // Atualiza a URL com o base64 para salvar
+        });
+    }
+  });
+  
+  // Listeners de Autenticação e Perfil
+  $("#userBadge").addEventListener("click", () => {
+    currentUser ? openProfileModal() : openAuthModal();
+  });
+  $("#tabLogin").addEventListener("click", showLoginForm);
+  $("#tabRegister").addEventListener("click", showRegisterForm);
+  $("#loginSubmit").addEventListener("click", doLogin);
+  $("#registerSubmit").addEventListener("click", doRegister);
+  $("#loginCancel").addEventListener("click", closeAuthModal);
+  $("#registerCancel").addEventListener("click", closeAuthModal);
+  $("#logoutBtn").addEventListener("click", logout);
+  $("#closeProfile").addEventListener("click", closeProfileModal);
+  $("#btnAddUserAddress").addEventListener("click", addUserAddress);
+
+  // Listeners de Checkout
+  $("#checkoutCancel").addEventListener("click", closeCheckoutModal);
+  $("#checkoutForm").addEventListener("submit", finalizeOrder); // <--- CHAMA A FUNÇÃO FIREBASE
+  $("#deliveryAreaSelect").addEventListener("change", updateCheckoutTotal);
+  $("#checkoutSavedAddresses").addEventListener("change", (e) => {
+    $("#checkoutAddress").value = e.target.value;
+  });
+  document.querySelectorAll('input[name="paymentMethod"]').forEach(radio => {
+    radio.addEventListener('change', (e) => {
+        $("#cashChangeGroup").style.display = e.target.value === 'cash' ? 'block' : 'none';
+    });
+  });
+
+  // Listeners do Painel Admin
+  $("#btnAdminPanel").addEventListener("click", openAdminModal);
+  $("#closeAdminModal").addEventListener("click", closeAdminModal);
+  $("#tabOrders").addEventListener("click", () => {
+    document.querySelectorAll('.admin-panel').forEach(p => p.classList.add('hidden'));
+    $("#ordersPanel").classList.remove('hidden');
+    document.querySelectorAll('.admin-tabs button').forEach(b => b.classList.remove('active'));
+    $("#tabOrders").classList.add('active');
+    renderAdminOrders();
+  });
+  $("#tabSales").addEventListener("click", () => {
+    document.querySelectorAll('.admin-panel').forEach(p => p.classList.add('hidden'));
+    $("#salesPanel").classList.remove('hidden');
+    document.querySelectorAll('.admin-tabs button').forEach(b => b.classList.remove('active'));
+    $("#tabSales").classList.add('active');
+    renderAdminDashboard(); 
+  });
+  $("#tabCustomers").addEventListener("click", () => {
+    document.querySelectorAll('.admin-panel').forEach(p => p.classList.add('hidden'));
+    $("#customersPanel").classList.remove('hidden');
+    document.querySelectorAll('.admin-tabs button').forEach(b => b.classList.remove('active'));
+    $("#tabCustomers").classList.add('active');
+    renderAdminCustomers();
+  });
+  $("#tabSettings").addEventListener("click", () => {
+    document.querySelectorAll('.admin-panel').forEach(p => p.classList.add('hidden'));
+    $("#settingsPanel").classList.remove('hidden');
+    document.querySelectorAll('.admin-tabs button').forEach(b => b.classList.remove('active'));
+    $("#tabSettings").classList.add('active');
+    renderStoreSettings();
+  });
+
+  $("#storeSettingsForm").addEventListener("submit", saveStoreSettings); // <--- CHAMA A FUNÇÃO FIREBASE
+  $("#btnAddDeliveryArea").addEventListener("click", addDeliveryArea);
+  $("#btnReset").addEventListener("click", resetDemo); // <--- CHAMA A FUNÇÃO FIREBASE
+
+  // Listeners para fechar modais ao clicar no fundo
+  $("#modal").addEventListener("click", (e) => { if(e.target.id === "modal"){ closeModal(); } });
+  $("#itemDetailsModal").addEventListener("click", (e) => { if(e.target.id === "itemDetailsModal"){ closeItemDetailsModal(); } });
+  $("#addonManagementModal").addEventListener("click", (e) => { if(e.target.id === "addonManagementModal"){ closeAddonManagementModal(); } });
+  $("#imageEditModal").addEventListener("click", (e) => { if(e.target.id === "imageEditModal"){ closeImageEditModal(); } });
+  $("#authModal").addEventListener("click", (e) => { if(e.target.id === "authModal"){ closeAuthModal(); } });
+  $("#profileModal").addEventListener("click", (e) => { if(e.target.id === "profileModal"){ closeProfileModal(); } });
+  $("#checkoutModal").addEventListener("click", (e) => { if(e.target.id === "checkoutModal"){ closeCheckoutModal(); } });
+  $("#adminModal").addEventListener("click", (e) => { if(e.target.id === "adminModal"){ closeAdminModal(); } });
+  $("#confirmationModal").addEventListener("click", (e) => { if(e.target.id === "confirmationModal"){ closeConfirmationModal(); } });
+  $("#closeConfirmationModal").addEventListener("click", closeConfirmationModal);
+}
+
+// === INICIALIZAÇÃO FINAL ===
+
+document.addEventListener("DOMContentLoaded", () => {
+  users = loadUsers(); // Carrega usuários locais (para a demo de login)
+  fetchMenuData(); // 👈 Começa buscando dados do Firebase
+  initListeners();
+});
+
+// =========================================================================
+// === EXPOSIÇÃO GLOBAL DE FUNÇÕES (CORREÇÃO DE ONCLICK/ONCHANGE) ===
+// Funções chamadas a partir de HTML gerado dinamicamente precisam estar no escopo global (window)
+// =========================================================================
+window.updateOrderStatus = updateOrderStatus;
+window.removeUserAddress = removeUserAddress;
+window.addAddonGroup = addAddonGroup;
+window.removeAddonGroup = removeAddonGroup;
+window.addAddonItem = addAddonItem;
+window.removeAddonItem = removeAddonItem;
+window.updateAddonGroupProp = updateAddonGroupProp;
+window.updateAddonItemProp = updateAddonItemProp;
+
+</script>
+</body>
+</html>
